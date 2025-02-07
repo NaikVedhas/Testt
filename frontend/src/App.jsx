@@ -5,7 +5,7 @@ function App() {
   return (
    <>
       <UploadImage/>
-      <ShowImages/>
+      {/* <ShowImages/> */}
    </>
   )
 }
