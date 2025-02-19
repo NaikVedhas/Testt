@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();    
 const imageRoute = require("./routes/imageRoute");
+const cors = require('cors')
 
 const app = express();
 

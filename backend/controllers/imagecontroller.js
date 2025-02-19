@@ -1,50 +1,63 @@
+const multer = require("multer");
 const Image = require("../models/imageModel");
+const axios = require("axios");
+const FormData = require("form-data");
+const fs = require("fs");
+require("dotenv").config();
 
+// Set up Multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Save uploads in the "uploads" folder
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
+
+// Upload Image API
 const uploadImage = async (req, res) => {
-  //upload to ipfs and get th cid  store to mongodb and get that id store to blockchain
-
   try {
-    const { image } = req.body;
-
-    if (!image) {
-      return res.status(400).json({ message: "Image is required" });
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required" });
     }
 
-    //upload to ipfs
-    try {
-        
-    } catch (error) {
-      console.log("Error in IPFs", error);
-      return res.status(400).json({ message: "Server Error" });
-    }
+    console.log("Received Image:", req.file);
 
-    // store the hashb in db
+    // Upload to IPFS using Pinata
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(req.file.path));
 
-    try {
-      let hash;
-      const newImage = await Image.create({ image: hash });
+    // Metadata required by Pinata
+    formData.append("pinataMetadata", JSON.stringify({ name: req.file.originalname }));
+    formData.append("pinataOptions", JSON.stringify({ cidVersion: 0 }));
 
-    } catch (error) {
-      console.log("Error in MongoDB", error);
-      return res.status(400).json({ message: "Server Error" });
-    }
+    const pinataResponse = await axios.post(
+      "https://api.pinata.cloud/pinning/pinFileToIPFS",
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+          pinata_api_key: process.env.PINATA_API_KEY,
+          pinata_secret_api_key: process.env.PINATA_SECRET_API_KEY,
+        },
+      }
+    );
 
-    //send the hash to blockchain
-    try {
-        
-    } catch (error) {
-        console.log("Error in blockchain", error);
-        return res.status(400).json({ message: "Server Error" });
-    }
+    const ipfsHash = pinataResponse.data.IpfsHash;
+    console.log("IPFS Hash:", ipfsHash);
 
+    // Store IPFS hash in MongoDB
+    // const newImage = await Image.create({ image: ipfsHash });
 
+    return res.status(200).json({ message: "Uploaded successfully", ipfsHash});
 
   } catch (error) {
-    console.log("Error in UploadImage", error);
-    return res.status(500).json({ message: "Server Error" });
+    console.error("Error in Upload:", error);
+    return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
-module.exports = {
-  uploadImage,
-};
+module.exports = { uploadImage, upload };  // Export upload and uploadImage
